@@ -12,6 +12,7 @@ library(ggplot2)
 # 2. Load & Filter Raw CSVs for Fresno
 # https://aqs.epa.gov/aqsweb/airdata/download_files.html
 files <- c(
+  "data/daily_88101_2016.csv",
   "data/daily_88101_2017.csv",
   "data/daily_88101_2018.csv",
   "data/daily_88101_2019.csv",
@@ -26,15 +27,20 @@ files <- c(
 fresno_list <- list()
 
 for (file in files) {
+  # Read CSV with Date Local as character due to inconsistent formatting
   temp <- read_csv(file,
                    col_types = cols(
-                     `Date Local` = col_date(format = "%Y-%m-%d"),
+                     `Date Local` = col_character(),
                      `Arithmetic Mean` = col_double(),
                      `State Code` = col_character(),
                      `County Code` = col_character()
                    )) %>%
     select(`Date Local`, `Arithmetic Mean`, `State Code`, `County Code`) %>%
-    filter(`State Code` == "06", `County Code` == "019")  # Fresno County
+    filter(`State Code` == "06", `County Code` == "019") %>%
+    mutate(
+      `Date Local` = parse_date_time(`Date Local`, orders = c("ymd", "mdy", "dmy"))
+    )
+  
   
   fresno_list[[file]] <- temp
 }
@@ -47,7 +53,7 @@ pm25_fresno <- bind_rows(fresno_list) %>%
 # view(pm25_fresno)
 
 # Save combined CSV
-write_csv(pm25_fresno, "data/pm25_fresno_2017_2025.csv")
+write_csv(pm25_fresno, "data/pm25_fresno_2016_2025.csv")
 
 
 
@@ -78,7 +84,7 @@ monthly_pm25_full <- tibble(YearMonth = full_months) %>%
 
 # 4. Plot Monthly Trend
 trend_plot <- ggplot(monthly_pm25_full, aes(x = YearMonth, y = mean_PM25)) +
-  geom_line(color = "darkred", size = 1) +
+  geom_line(color = "darkred", linewidth = 1) +
   labs(title = "Monthly Average PM2.5 - Fresno County",
        x = "Year",
        y = expression("PM2.5 ("*mu*"g/m"^3*")")) +
