@@ -8,10 +8,10 @@ library(zoo)
 library(ggplot2)
 
 
-
 # 2. Load & Filter Raw CSVs for Fresno
 # https://aqs.epa.gov/aqsweb/airdata/download_files.html
 files <- c(
+  "data/daily_88101_2015.csv",
   "data/daily_88101_2016.csv",
   "data/daily_88101_2017.csv",
   "data/daily_88101_2018.csv",
@@ -27,7 +27,7 @@ files <- c(
 fresno_list <- list()
 
 for (file in files) {
-  # Read CSV with Date Local as character due to inconsistent formatting
+  
   temp <- read_csv(file,
                    col_types = cols(
                      `Date Local` = col_character(),
@@ -41,20 +41,17 @@ for (file in files) {
       `Date Local` = parse_date_time(`Date Local`, orders = c("ymd", "mdy", "dmy"))
     )
   
-  
   fresno_list[[file]] <- temp
 }
 
-# Combine all Fresno data, remove rows with missing dates
+# Combine all Fresno data
 pm25_fresno <- bind_rows(fresno_list) %>%
   filter(!is.na(`Date Local`)) %>%
   arrange(`Date Local`)
 
-# view(pm25_fresno)
+write_csv(pm25_fresno, "data/pm25_fresno_2015_2025.csv")
 
-# Save combined CSV
-write_csv(pm25_fresno, "data/pm25_fresno_2016_2025.csv")
-
+#view(pm25_fresno)
 
 
 # 3. Monthly Aggregation & Fill Missing Months
@@ -65,21 +62,13 @@ monthly_pm25 <- pm25_fresno %>%
   summarise(mean_PM25 = mean(PM25, na.rm = TRUE)) %>%
   ungroup()
 
-# view(monthly_pm25)
-
-# Fill in missing months with NA
 full_months <- seq(min(monthly_pm25$YearMonth),
                    max(monthly_pm25$YearMonth),
                    by = "month")
 
-# view(full_months)
-
 monthly_pm25_full <- tibble(YearMonth = full_months) %>%
   left_join(monthly_pm25, by = "YearMonth") %>%
   arrange(YearMonth)
-
-# view(monthly_pm25_full)
-
 
 
 # 4. Plot Monthly Trend
@@ -93,8 +82,7 @@ trend_plot <- ggplot(monthly_pm25_full, aes(x = YearMonth, y = mean_PM25)) +
 ggsave("outputs/trend_plot.png", trend_plot, width = 8, height = 5)
 
 
-
-# 5. Create Time Series with Proper Dates
+# 5. Create Time Series
 start_year <- year(min(monthly_pm25_full$YearMonth))
 start_month <- month(min(monthly_pm25_full$YearMonth))
 
@@ -102,9 +90,7 @@ ts_pm25 <- ts(monthly_pm25_full$mean_PM25,
               frequency = 12,
               start = c(start_year, start_month))
 
-# Interpolate missing months for STL & forecast
 ts_pm25_interp <- na.interp(ts_pm25)
-
 
 
 # 6. STL Decomposition
@@ -115,23 +101,33 @@ plot(decomp)
 dev.off()
 
 
-
 # 7. Stationarity Check (ADF Test)
 adf_test <- adf.test(ts_pm25_interp)
 print(adf_test)
 
 
+# 8. ARIMA Forecast (Train 2015–2024, Predict 2025)
+train_series <- window(ts_pm25_interp, end = c(2024,12))
+test_series <- window(ts_pm25_interp, start = c(2025,1), end = c(2025,12))
 
-# 8. ARIMA Forecast (12 months ahead)
-model <- auto.arima(ts_pm25_interp)
+model <- auto.arima(train_series)
+
 forecast_pm25 <- forecast(model, h = 12)
 
-png("outputs/forecast_plot.png", width = 800, height = 600)
+png("outputs/forecast_vs_actual_2025.png", width = 900, height = 600)
 plot(forecast_pm25,
-     main = "12-Month PM2.5 Forecast - Fresno County",
+     main = "PM2.5 Forecast vs Actual (2025) - Fresno County",
      ylab = expression("PM2.5 ("*mu*"g/m"^3*")"))
+
+lines(test_series, col = "red", lwd = 2)
+legend("topleft",
+       legend = c("Forecast 2025","Actual 2025"),
+       col = c("blue","red"),
+       lwd = 2)
 dev.off()
 
+accuracy_results <- accuracy(forecast_pm25, test_series)
+print(accuracy_results)
 
 
 # 9. Annual Averages vs EPA Standard
@@ -144,14 +140,13 @@ annual_avg <- pm25_fresno %>%
 
 annual_plot <- ggplot(annual_avg, aes(x = Year, y = mean_PM25)) +
   geom_line(color = "blue", size = 1) +
-  geom_hline(yintercept = 12, linetype = "dashed", color = "red") +
+  geom_hline(yintercept = 9, linetype = "dashed", color = "red") +
   labs(title = "Annual Average PM2.5 vs EPA Standard",
        y = expression("PM2.5 ("*mu*"g/m"^3*")"),
        x = "Year") +
   theme_minimal()
 
 ggsave("outputs/annual_standard_comparison.png", annual_plot, width = 8, height = 5)
-
 
 
 # 10. Rolling Average (6-Month)
@@ -166,4 +161,5 @@ rolling_plot <- ggplot(monthly_pm25_full, aes(x = YearMonth)) +
   theme_minimal()
 
 ggsave("outputs/rolling_average.png", rolling_plot, width = 8, height = 5)
+
 
