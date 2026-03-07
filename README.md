@@ -4,7 +4,7 @@
 
 This project analyzes long-term trends in **fine particulate matter (PM2.5)** for **Fresno County, California** using publicly available data from the **U.S. EPA Air Quality System (AQS)**.
 
-The analysis combines daily PM2.5 data from **2016–2025**, performs **time-series modeling**, **seasonal decomposition**, and **ARIMA forecasting**, and evaluates air quality relative to the **EPA annual standard (12 µg/m³)**.
+The analysis combines daily PM2.5 data from **2015–2025**, performs **time-series modeling**, **seasonal decomposition**, and **ARIMA forecasting**, and evaluates air quality relative to the **EPA annual standard (9 µg/m³)**.
 
 This project demonstrates applied skills in:
 
@@ -46,11 +46,11 @@ Only Fresno County observations were retained and aggregated for analysis.
 
 ### 1. Data Preparation
 
-- Loaded annual daily PM2.5 CSV files (2016–2025)
+- Loaded annual daily PM2.5 CSV files (2015–2025)
 - Filtered for Fresno County (State Code 06, County Code 019)
 - Combined all years into a single dataset
 - Removed missing date values
-- Saved cleaned dataset: data/pm25_fresno_2016_2025.csv
+- Saved cleaned dataset: data/pm25_fresno_2015_2025.csv
 
 
 ---
@@ -95,8 +95,9 @@ Performed **Augmented Dickey-Fuller (ADF) test** to evaluate time series station
 - Used `auto.arima()` to select optimal model parameters
 - Forecasted PM2.5 concentrations **12 months ahead**
 - Generated confidence intervals for prediction uncertainty
+- Compared to actual 2025 PM2.5 data
 
-Output: outputs/forecast_plot.png
+Output: outputs/forecast_vs_actual_2025.png
 
 
 ---
@@ -105,7 +106,7 @@ Output: outputs/forecast_plot.png
 
 Calculated annual mean PM2.5 concentrations and compared them to the:
 
-**EPA Annual PM2.5 Standard: 12 µg/m³**
+**EPA Annual PM2.5 Standard: 9 µg/m³**
 
 Output: outputs/annual_standard_comparison.png
 
